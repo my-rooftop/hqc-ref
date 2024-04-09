@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <time.h>
 #include "api.h"
 #include "parameters.h"
 
@@ -24,10 +25,28 @@ int main() {
 	unsigned char ct[CIPHERTEXT_BYTES];
 	unsigned char key1[SHARED_SECRET_BYTES];
 	unsigned char key2[SHARED_SECRET_BYTES];
+	clock_t start, end;
+	double cpu_time_used;
 
+
+	start = clock();
 	crypto_kem_keypair(pk, sk);
+	end = clock();
+	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+	printf("keygen time: %f\n", cpu_time_used);
+
+	start = clock();
 	crypto_kem_enc(ct, key1, pk);
+	end = clock();
+	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+	printf("encrypt time: %f\n", cpu_time_used);
+
+	start = clock();
 	crypto_kem_dec(key2, ct, sk);
+	end = clock();
+	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+	printf("decrypt time: %f\n", cpu_time_used);
+
 
 	printf("\n\nsecret1: ");
 	for(int i = 0 ; i < SHARED_SECRET_BYTES ; ++i) printf("%x", key1[i]);
