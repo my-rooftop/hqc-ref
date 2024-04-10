@@ -25,27 +25,39 @@ int main() {
 	unsigned char ct[CIPHERTEXT_BYTES];
 	unsigned char key1[SHARED_SECRET_BYTES];
 	unsigned char key2[SHARED_SECRET_BYTES];
-	clock_t start, end;
-	double cpu_time_used;
+	
+	int iter = 20000; 
+	int keygen_t = 0; 
+	int encrypt_t = 0;
+	int decrypt_t = 0;
 
+	clock_t start, end;
+	int cpu_time_used;
+
+	for (int i = 0; i < iter; i++) {
 
 	start = clock();
 	crypto_kem_keypair(pk, sk);
 	end = clock();
-	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-	printf("keygen time: %f\n", cpu_time_used);
+	cpu_time_used = ((int) (end - start));
+	keygen_t += cpu_time_used;
 
 	start = clock();
 	crypto_kem_enc(ct, key1, pk);
 	end = clock();
-	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-	printf("encrypt time: %f\n", cpu_time_used);
+	cpu_time_used = ((int) (end - start));
+	encrypt_t += cpu_time_used;
 
 	start = clock();
 	crypto_kem_dec(key2, ct, sk);
 	end = clock();
-	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-	printf("decrypt time: %f\n", cpu_time_used);
+	cpu_time_used = ((int) (end - start));
+	decrypt_t += cpu_time_used;
+	}
+
+	printf("\n keygen time: %f msec", ((double)keygen_t) / (double)iter / CLOCKS_PER_SEC * 1000);
+	printf("\n encrypt time: %f msec", ((double)encrypt_t) / (double)iter / CLOCKS_PER_SEC * 1000);
+	printf("\n decrypt time: %f msec", ((double)decrypt_t) / (double)iter / CLOCKS_PER_SEC * 1000);
 
 
 	printf("\n\nsecret1: ");
