@@ -9,7 +9,7 @@
 #include "vector.h"
 #include <stdint.h>
 #include <string.h>
-
+#include <time.h>
 
 /**
  * @brief Parse a secret key into a string
@@ -42,6 +42,30 @@ void hqc_secret_key_to_string(uint8_t *sk, const uint8_t *sk_seed, const uint8_t
  * @param[out] pk String containing the public key
  * @param[in] sk String containing the secret key
  */
+void hqc_secret_key_from_string(uint64_t *x, uint64_t *y, uint8_t *sigma, uint8_t *pk, const uint8_t *sk, Trace_time* decap_time) {
+    seedexpander_state sk_seedexpander;
+    uint8_t sk_seed[SEED_BYTES] = {0};
+    clock_t start, end;
+
+    start = clock();
+    memcpy(sk_seed, sk, SEED_BYTES);
+    memcpy(sigma, sk + SEED_BYTES, VEC_K_SIZE_BYTES);
+    end = clock();
+    decap_time->parsing_time += ((uint32_t)(end - start));
+
+    start = clock();
+    seedexpander_init(&sk_seedexpander, sk_seed, SEED_BYTES);
+    end = clock();
+    decap_time->seedexpander_init_time += ((uint32_t)(end - start));
+    
+    start = clock();
+    vect_set_random_fixed_weight(&sk_seedexpander, x, PARAM_OMEGA);
+    vect_set_random_fixed_weight(&sk_seedexpander, y, PARAM_OMEGA);
+    end = clock();
+    decap_time->vect_set_random_fixed_weight_time += ((uint32_t)(end - start));
+    memcpy(pk, sk + SEED_BYTES + VEC_K_SIZE_BYTES, PUBLIC_KEY_BYTES);
+}
+
 void hqc_secret_key_from_string(uint64_t *x, uint64_t *y, uint8_t *sigma, uint8_t *pk, const uint8_t *sk) {
     seedexpander_state sk_seedexpander;
     uint8_t sk_seed[SEED_BYTES] = {0};
@@ -93,7 +117,25 @@ void hqc_public_key_from_string(uint64_t *h, uint64_t *s, const uint8_t *pk) {
     memcpy(s, pk + SEED_BYTES, VEC_N_SIZE_BYTES);
 }
 
+void hqc_public_key_from_string(uint64_t *h, uint64_t *s, const uint8_t *pk, Trace_time* common_time) {
+    seedexpander_state pk_seedexpander;
+    uint8_t pk_seed[SEED_BYTES] = {0};
+    clock_t start, end;
 
+    memcpy(pk_seed, pk, SEED_BYTES);
+
+    start = clock();
+    seedexpander_init(&pk_seedexpander, pk_seed, SEED_BYTES);
+    end = clock();
+    common_time->seedexpander_init_time += ((uint32_t)(end - start));
+
+    start = clock();
+    vect_set_random(&pk_seedexpander, h);
+    end = clock();
+    common_time->vect_set_random_time += ((uint32_t)(end - start));
+
+    memcpy(s, pk + SEED_BYTES, VEC_N_SIZE_BYTES);
+}
 
 /**
  * @brief Parse a ciphertext into a string

@@ -2,6 +2,7 @@
 #include <time.h>
 #include "api.h"
 #include "parameters.h"
+#include "profiling.h"
 
 int main() {
 
@@ -27,37 +28,26 @@ int main() {
 	unsigned char key2[SHARED_SECRET_BYTES];
 	
 	int iter = 20000; 
-	int keygen_t = 0; 
-	int encrypt_t = 0;
-	int decrypt_t = 0;
 
-	clock_t start, end;
-	int cpu_time_used;
+	Trace_time keygen_time;
+	Trace_time encap_time;
+	Trace_time decap_time;
 
 	for (int i = 0; i < iter; i++) {
 
-	start = clock();
-	crypto_kem_keypair(pk, sk);
-	end = clock();
-	cpu_time_used = ((int) (end - start));
-	keygen_t += cpu_time_used;
+		crypto_kem_keypair(pk, sk, &keygen_time);
 
-	start = clock();
-	crypto_kem_enc(ct, key1, pk);
-	end = clock();
-	cpu_time_used = ((int) (end - start));
-	encrypt_t += cpu_time_used;
+		crypto_kem_enc(ct, key1, pk, &encap_time);
 
-	start = clock();
-	crypto_kem_dec(key2, ct, sk);
-	end = clock();
-	cpu_time_used = ((int) (end - start));
-	decrypt_t += cpu_time_used;
+		crypto_kem_dec(key2, ct, sk, &decap_time);
 	}
 
-	printf("\n keygen time: %f msec", ((double)keygen_t) / (double)iter / CLOCKS_PER_SEC * 1000);
-	printf("\n encrypt time: %f msec", ((double)encrypt_t) / (double)iter / CLOCKS_PER_SEC * 1000);
-	printf("\n decrypt time: %f msec", ((double)decrypt_t) / (double)iter / CLOCKS_PER_SEC * 1000);
+	printf("\nkeygen\n");
+	time_analysis(&keygen_time);
+	printf("encap \n");
+	time_analysis(&encap_time);
+	printf("decap \n");
+	time_analysis(&decap_time);
 
 
 	printf("\n\nsecret1: ");
