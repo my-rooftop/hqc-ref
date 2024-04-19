@@ -1,2 +1,4 @@
 ./hqc-128/bin/
 .vscode/
+*.o
+hqc-128
