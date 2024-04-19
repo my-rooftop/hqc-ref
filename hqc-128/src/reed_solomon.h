@@ -14,6 +14,7 @@ static const uint16_t alpha_ij_pow [30][45] = {{2, 4, 8, 16, 32, 64, 128, 29, 58
 
 void reed_solomon_encode(uint64_t* cdw, const uint64_t* msg);
 void reed_solomon_decode(uint64_t* msg, uint64_t* cdw);
+void reed_solomon_decode(uint64_t* msg, uint64_t* cdw, Trace_time* common_time);
 
 void compute_generator_poly(uint16_t* poly);
 

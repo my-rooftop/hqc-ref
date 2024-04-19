@@ -48,6 +48,8 @@ int main() {
 	time_analysis(&encap_time);
 	printf("decap \n");
 	time_analysis(&decap_time);
+	printf("rs-decode details \n");
+	rs_decode_detail_analysis(&decap_time);
 
 
 	printf("\n\nsecret1: ");

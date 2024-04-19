@@ -149,10 +149,8 @@ void hqc_pke_encrypt(uint64_t *u, uint64_t *v, uint64_t *m, unsigned char *theta
     common_time->vect_operation_time += ((uint32_t)(end - start));
 
     // Compute v = m.G by encoding the message
-    start = clock();
-    code_encode(v, m); //rs-rm encoding
-    end = clock();
-    common_time->code_encode_time += ((uint32_t)(end - start));
+
+    code_encode(v, m, common_time); //rs-rm encoding
 
     start = clock();
     vect_resize(tmp1, PARAM_N, v, PARAM_N1N2);
@@ -268,10 +266,8 @@ uint8_t hqc_pke_decrypt(uint64_t *m, uint8_t *sigma, const uint64_t *u, const ui
     #endif
 
     // Compute m by decoding v - u.y
-    start = clock();
-    code_decode(m, tmp2);
-    end = clock();
-    decap_time->code_decode_time += ((uint32_t)(end - start));
+    code_decode(m, tmp2, decap_time);
+
     //rm-rs decoding 연산
     
     return 0;

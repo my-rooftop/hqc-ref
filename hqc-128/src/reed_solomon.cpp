@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+#include <time.h>
 #ifdef VERBOSE
 #include <stdbool.h>
 #include <stdio.h>
@@ -404,6 +405,120 @@ void reed_solomon_decode(uint64_t *msg, uint64_t *cdw) {
 
     // Correct the errors
     correct_errors(cdw_bytes, error_values);
+
+    // Retrieve the message from the decoded codeword
+    memcpy(msg, cdw_bytes + (PARAM_G - 1) , PARAM_K);
+
+    #ifdef VERBOSE
+        printf("\n\nThe syndromes: ");
+        for (size_t i = 0 ; i < 2*PARAM_DELTA ; ++i) {
+            printf("%u ", syndromes[i]);
+        }
+        printf("\n\nThe error locator polynomial: sigma(x) = ");
+        bool first_coeff = true;
+        if (sigma[0]) {
+            printf("%u", sigma[0]);
+            first_coeff = false;
+        }
+        for (size_t i = 1 ; i < (1 << PARAM_FFT) ; ++i) {
+            if (sigma[i] == 0)
+                continue;
+            if (!first_coeff)
+                printf(" + ");
+            first_coeff = false;
+            if(sigma[i] != 1)
+                printf("%u ", sigma[i]);
+            if (i == 1)
+                printf("x");
+            else
+                printf("x^%zu", i);
+        }
+        if (first_coeff)
+            printf("0");
+
+        printf("\n\nThe polynomial: z(x) = ");
+        bool first_coeff_1 = true;
+        if (z[0]) {
+            printf("%u", z[0]);
+            first_coeff_1 = false;
+        }
+        for (size_t i = 1 ; i < (PARAM_DELTA + 1) ; ++i) {
+            if (z[i] == 0)
+                continue;
+            if (!first_coeff_1)
+                printf(" + ");
+            first_coeff_1 = false;
+            if(z[i] != 1)
+                printf("%u ", z[i]);
+            if (i == 1)
+                printf("x");
+            else
+                printf("x^%zu", i);
+        }
+        if (first_coeff_1)
+            printf("0");
+
+        printf("\n\nThe pairs of (error locator numbers, error values): ");
+        size_t j = 0;
+        for (size_t i = 0 ; i < PARAM_N1 ; ++i) {
+            if(error[i]){
+                printf("(%zu, %d) ", i, error_values[j]);
+                j++;
+            }
+        }
+        printf("\n");
+    #endif
+}
+
+void reed_solomon_decode(uint64_t *msg, uint64_t *cdw, Trace_time* common_time) {
+    uint8_t cdw_bytes[PARAM_N1] = {0};
+    uint16_t syndromes[2 * PARAM_DELTA] = {0};
+    uint16_t sigma[1 << PARAM_FFT] = {0};
+    uint8_t error[1 << PARAM_M] = {0};
+    uint16_t z[PARAM_N1] = {0};
+    uint16_t error_values[PARAM_N1] = {0};
+    uint16_t deg;
+    clock_t start, end;
+
+    // Copy the vector in an array of bytes
+    memcpy(cdw_bytes, cdw, PARAM_N1);
+
+    // Calculate the 2*PARAM_DELTA syndromes
+    start = clock();
+    compute_syndromes(syndromes, cdw_bytes);
+    end = clock();
+    common_time->compute_syndromes_time += ((uint32_t)(end - start));
+
+    // Compute the error locator polynomial sigma
+    // Sigma's degree is at most PARAM_DELTA but the FFT requires the extra room
+    start = clock();
+    deg = compute_elp(sigma, syndromes);
+    end = clock();
+    common_time->compute_elp_time += ((uint32_t)(end-start));
+    
+    // Compute the error polynomial error
+    start = clock();
+    compute_roots(error, sigma);
+    end = clock();
+    common_time->compute_roots_time += ((uint32_t)(end - start));
+
+    // Compute the polynomial z(x)
+    start = clock();
+    compute_z_poly(z, sigma, deg, syndromes);
+    end = clock();
+    common_time->compute_z_poly_time += ((uint32_t)(end - start));
+
+    // Compute the error values
+    start = clock();
+    compute_error_values(error_values, z, error);
+    end = clock();
+    common_time->compute_error_values_time += ((uint32_t)(end - start));
+
+    // Correct the errors
+    start = clock();
+    correct_errors(cdw_bytes, error_values);
+    end = clock();
+    common_time->correct_errors_time += ((uint32_t)(end - start));
 
     // Retrieve the message from the decoded codeword
     memcpy(msg, cdw_bytes + (PARAM_G - 1) , PARAM_K);
