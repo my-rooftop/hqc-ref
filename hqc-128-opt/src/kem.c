@@ -10,9 +10,11 @@
 #include "shake_ds.h"
 #include "fips202.h"
 #include "vector.h"
+#include "profiling.h"
 #include <stdint.h>
 #include <string.h>
 #include <immintrin.h>
+#include <time.h>
 #ifdef VERBOSE
 #include <stdio.h>
 #endif
@@ -30,12 +32,12 @@
  * @param[out] sk String containing the secret key
  * @returns 0 if keygen is successful
  */
-int crypto_kem_keypair(unsigned char *pk, unsigned char *sk) {
+int crypto_kem_keypair(unsigned char *pk, unsigned char *sk, struct Trace_time* trace_time) {
     #ifdef VERBOSE
         printf("\n\n\n\n### KEYGEN ###");
     #endif
 
-    hqc_pke_keygen(pk, sk);
+    hqc_pke_keygen(pk, sk, trace_time);
     return 0;
 }
 
@@ -49,7 +51,7 @@ int crypto_kem_keypair(unsigned char *pk, unsigned char *sk) {
  * @param[in] pk String containing the public key
  * @returns 0 if encapsulation is successful
  */
-int crypto_kem_enc(unsigned char *ct, unsigned char *ss, const unsigned char *pk) {
+int crypto_kem_enc(unsigned char *ct, unsigned char *ss, const unsigned char *pk, struct Trace_time* trace_time) {
     #ifdef VERBOSE
         printf("\n\n\n\n### ENCAPS ###");
     #endif
@@ -62,28 +64,51 @@ int crypto_kem_enc(unsigned char *ct, unsigned char *ss, const unsigned char *pk
     uint64_t salt[SALT_SIZE_64] = {0};
     uint8_t tmp[VEC_K_SIZE_BYTES + PUBLIC_KEY_BYTES + SALT_SIZE_BYTES] = {0};
     shake256incctx shake256state;
+    clock_t start, end;
+    trace_time->stack += 1;
 
+    start = clock();
     // Computing m
     vect_set_random_from_prng((uint64_t *)m, VEC_K_SIZE_64);
-
     // Computing theta
     vect_set_random_from_prng(salt, SALT_SIZE_64);
+    end = clock();
+    trace_time->shake_prng_time += ((uint32_t)(end - start));
+
+    start = clock();
     memcpy(tmp, m, VEC_K_SIZE_BYTES);
     memcpy(tmp + VEC_K_SIZE_BYTES, pk, PUBLIC_KEY_BYTES);
     memcpy(tmp + VEC_K_SIZE_BYTES + PUBLIC_KEY_BYTES, salt, SALT_SIZE_BYTES);
+    end = clock();
+    trace_time->parsing_time += ((uint32_t) (end - start));
+
+    start = clock();
     shake256_512_ds(&shake256state, theta, tmp, VEC_K_SIZE_BYTES + PUBLIC_KEY_BYTES + SALT_SIZE_BYTES, G_FCT_DOMAIN);
+    end = clock();
+    trace_time->shake256_512_ds_time += ((uint32_t) (end - start));
 
     // Encrypting m
-    hqc_pke_encrypt(u, v, (uint64_t *)m, theta, pk);
+    hqc_pke_encrypt(u, v, (uint64_t *)m, theta, pk, trace_time);
 
+    start = clock();
     // Computing shared secret
     memcpy(mc, m, VEC_K_SIZE_BYTES);
     memcpy(mc + VEC_K_SIZE_BYTES, u, VEC_N_SIZE_BYTES);
     memcpy(mc + VEC_K_SIZE_BYTES + VEC_N_SIZE_BYTES, v, VEC_N1N2_SIZE_BYTES);
-    shake256_512_ds(&shake256state, ss, mc, VEC_K_SIZE_BYTES + VEC_N_SIZE_BYTES + VEC_N1N2_SIZE_BYTES, K_FCT_DOMAIN);
+    end = clock();
+    trace_time->parsing_time += ((uint32_t)(end - start));
 
+    start = clock();
+    shake256_512_ds(&shake256state, ss, mc, VEC_K_SIZE_BYTES + VEC_N_SIZE_BYTES + VEC_N1N2_SIZE_BYTES, K_FCT_DOMAIN);
+    end = clock();
+    trace_time->shake256_512_ds_time += ((uint32_t)(end - start));
+
+
+    start = clock();
     // Computing ciphertext
     hqc_ciphertext_to_string(ct, u, v, salt);
+    end = clock();
+    trace_time->parsing_time += ((uint32_t)(end - start));
 
     #ifdef VERBOSE
         printf("\n\npk: "); for(int i = 0 ; i < PUBLIC_KEY_BYTES ; ++i) printf("%02x", pk[i]);
@@ -106,7 +131,7 @@ int crypto_kem_enc(unsigned char *ct, unsigned char *ss, const unsigned char *pk
  * @param[in] sk String containing the secret key
  * @returns 0 if decapsulation is successful, -1 otherwise
  */
-int crypto_kem_dec(unsigned char *ss, const unsigned char *ct, const unsigned char *sk) {
+int crypto_kem_dec(unsigned char *ss, const unsigned char *ct, const unsigned char *sk, struct Trace_time* trace_time) {
     #ifdef VERBOSE
         printf("\n\n\n\n### DECAPS ###");
     #endif
@@ -124,25 +149,39 @@ int crypto_kem_dec(unsigned char *ss, const unsigned char *ct, const unsigned ch
     uint64_t salt[SALT_SIZE_64] = {0};
     uint8_t tmp[VEC_K_SIZE_BYTES + PUBLIC_KEY_BYTES + SALT_SIZE_BYTES] = {0};
     shake256incctx shake256state;
+    clock_t start, end;
+
+    trace_time->stack += 1;
 
     // Retrieving u, v and d from ciphertext
+    start = clock();
     hqc_ciphertext_from_string((uint64_t *) u_256, v, salt, ct);
 
     // Retrieving pk from sk
     memcpy(pk, sk + SEED_BYTES, PUBLIC_KEY_BYTES);
+    end = clock();
+    trace_time->parsing_time += ((uint32_t)(end - start));
 
     // Decrypting
-    result = hqc_pke_decrypt((uint64_t *)m, sigma, u_256, v, sk);
+    result = hqc_pke_decrypt((uint64_t *)m, sigma, u_256, v, sk, trace_time);
 
     // Computing theta
+    start = clock();
     memcpy(tmp, m, VEC_K_SIZE_BYTES);
     memcpy(tmp + VEC_K_SIZE_BYTES, pk, PUBLIC_KEY_BYTES);
     memcpy(tmp + VEC_K_SIZE_BYTES + PUBLIC_KEY_BYTES, salt, SALT_SIZE_BYTES);
+    end = clock();
+    trace_time->parsing_time += ((uint32_t)(end - start));
+
+    start = clock();
     shake256_512_ds(&shake256state, theta, tmp, VEC_K_SIZE_BYTES + PUBLIC_KEY_BYTES + SALT_SIZE_BYTES, G_FCT_DOMAIN);
+    end = clock();
+    trace_time->shake256_512_ds_time += ((uint32_t)(end-start));
 
     // Encrypting m'
-    hqc_pke_encrypt(u2, v2, (uint64_t *)m, theta, pk);
+    hqc_pke_encrypt(u2, v2, (uint64_t *)m, theta, pk, trace_time);
 
+    start = clock();
     // Check if c != c'
     result |= vect_compare((uint8_t *) u_256, (uint8_t *) u2, VEC_N_SIZE_BYTES);
     result |= vect_compare((uint8_t *) v, (uint8_t *) v2, VEC_N1N2_SIZE_BYTES);
@@ -152,11 +191,20 @@ int crypto_kem_dec(unsigned char *ss, const unsigned char *ct, const unsigned ch
     for (size_t i = 0; i < VEC_K_SIZE_BYTES; ++i) {
         mc[i] = (m[i] & result) ^ (sigma[i] & ~result);
     }
+    end = clock();
+    trace_time->vect_operation_time += ((uint32_t)(end - start));
 
     // Computing shared secret
+    start = clock();
     memcpy(mc + VEC_K_SIZE_BYTES, u_256, VEC_N_SIZE_BYTES);
     memcpy(mc + VEC_K_SIZE_BYTES + VEC_N_SIZE_BYTES, v, VEC_N1N2_SIZE_BYTES);
+    end = clock();
+    trace_time->parsing_time += ((uint32_t)(end - start));
+
+    start = clock();
     shake256_512_ds(&shake256state, ss, mc, VEC_K_SIZE_BYTES + VEC_N_SIZE_BYTES + VEC_N1N2_SIZE_BYTES, K_FCT_DOMAIN);
+    end = clock();
+    trace_time->shake256_512_ds_time += ((uint32_t)(end - start));
 
     #ifdef VERBOSE
         printf("\n\npk: "); for(int i = 0 ; i < PUBLIC_KEY_BYTES ; ++i) printf("%02x", pk[i]);

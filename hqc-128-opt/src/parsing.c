@@ -9,6 +9,7 @@
 #include "vector.h"
 #include <stdint.h>
 #include <string.h>
+#include <time.h>
 
 
 /**
@@ -42,16 +43,27 @@ void hqc_secret_key_to_string(uint8_t *sk, const uint8_t *sk_seed, const uint8_t
  * @param[out] pk String containing the public key
  * @param[in] sk String containing the secret key
  */
-void hqc_secret_key_from_string(__m256i *x256, __m256i *y256, uint8_t *sigma, uint8_t *pk, const uint8_t *sk) {
+void hqc_secret_key_from_string(__m256i *x256, __m256i *y256, uint8_t *sigma, uint8_t *pk, const uint8_t *sk, struct Trace_time *trace_time) {
     seedexpander_state sk_seedexpander;
     uint8_t sk_seed[SEED_BYTES] = {0};
+    clock_t start, end;
 
+    start = clock();
     memcpy(sk_seed, sk, SEED_BYTES);
     memcpy(sigma, sk + SEED_BYTES, VEC_K_SIZE_BYTES);
-    seedexpander_init(&sk_seedexpander, sk_seed, SEED_BYTES);
+    end = clock();
+    trace_time->parsing_time += ((uint32_t)(end - start));
 
+    start = clock();
+    seedexpander_init(&sk_seedexpander, sk_seed, SEED_BYTES);
+    end = clock();
+    trace_time->seedexpander_init_time += ((uint32_t)(end - start));
+
+    start = clock();
     vect_set_random_fixed_weight(&sk_seedexpander, x256, PARAM_OMEGA);
     vect_set_random_fixed_weight(&sk_seedexpander, y256, PARAM_OMEGA);
+    end = clock();
+    trace_time->vect_set_random_fixed_weight_time += ((uint32_t)(end - start));
     memcpy(pk, sk + SEED_BYTES + VEC_K_SIZE_BYTES, PUBLIC_KEY_BYTES);
 }
 
@@ -82,13 +94,22 @@ void hqc_public_key_to_string(uint8_t *pk, const uint8_t *pk_seed, const uint64_
  * @param[out] s uint8_t representation of vector s
  * @param[in] pk String containing the public key
  */
-void hqc_public_key_from_string(uint64_t *h, uint64_t *s, const uint8_t *pk) {
+void hqc_public_key_from_string(uint64_t *h, uint64_t *s, const uint8_t *pk, struct Trace_time *trace_time) {
     seedexpander_state pk_seedexpander;
     uint8_t pk_seed[SEED_BYTES] = {0};
+    clock_t start, end;
 
     memcpy(pk_seed, pk, SEED_BYTES);
+
+    start = clock();
     seedexpander_init(&pk_seedexpander, pk_seed, SEED_BYTES);
+    end = clock();
+    trace_time->seedexpander_init_time += ((uint32_t)(end - start));
+
+    start = clock();
     vect_set_random(&pk_seedexpander, h);
+    end = clock();
+    trace_time->vect_set_random_time += ((uint32_t)(end - start));
 
     memcpy(s, pk + SEED_BYTES, VEC_N_SIZE_BYTES);
 }

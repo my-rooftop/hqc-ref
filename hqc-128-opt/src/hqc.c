@@ -10,7 +10,9 @@
 #include "gf2x.h"
 #include "code.h"
 #include "vector.h"
+#include "profiling.h"
 #include <stdint.h>
+#include <time.h>
 #include <string.h>
 #ifdef VERBOSE
 #include <stdio.h>
@@ -28,7 +30,7 @@
  * @param[out] pk String containing the public key
  * @param[out] sk String containing the secret key
  */
-void hqc_pke_keygen(unsigned char* pk, unsigned char* sk) {
+void hqc_pke_keygen(unsigned char* pk, unsigned char* sk, struct Trace_time *keygen_time) {
     seedexpander_state sk_seedexpander;
     seedexpander_state pk_seedexpander;
     uint8_t sk_seed[SEED_BYTES] = {0};
@@ -39,6 +41,9 @@ void hqc_pke_keygen(unsigned char* pk, unsigned char* sk) {
     static __m256i x_256[VEC_N_256_SIZE_64 >> 2];
     static uint64_t s[VEC_N_256_SIZE_64];
     static __m256i tmp_256[VEC_N_256_SIZE_64 >> 2];
+    clock_t start, end;
+
+    keygen_time->stack += 1;
 
     #ifdef __STDC_LIB_EXT1__
         memset_s(x_256, 0, (VEC_N_256_SIZE_64 >> 2) * sizeof(__m256i));
@@ -50,27 +55,46 @@ void hqc_pke_keygen(unsigned char* pk, unsigned char* sk) {
         memset(h_256, 0, (VEC_N_256_SIZE_64 >> 2) * sizeof(__m256i));
     #endif
 
-
+    start = clock();
     // Create seed_expanders for public key and secret key
     shake_prng(sk_seed, SEED_BYTES);
     shake_prng(sigma, VEC_K_SIZE_BYTES);
-    seedexpander_init(&sk_seedexpander, sk_seed, SEED_BYTES);
-
     shake_prng(pk_seed, SEED_BYTES);
+    end = clock();
+    keygen_time->shake_prng_time += ((uint32_t)(end - start));
+
+    start = clock();
+    seedexpander_init(&sk_seedexpander, sk_seed, SEED_BYTES);
     seedexpander_init(&pk_seedexpander, pk_seed, SEED_BYTES);
+    end = clock();
+    keygen_time->seedexpander_init_time += ((uint32_t)(end - start));
 
     // Compute secret key
+    start = clock();
     vect_set_random_fixed_weight(&sk_seedexpander, x_256, PARAM_OMEGA);
     vect_set_random_fixed_weight(&sk_seedexpander, y_256, PARAM_OMEGA);
+    end = clock();
+    keygen_time->vect_set_random_fixed_weight_time += ((uint32_t)(end - start));
 
     // Compute public key
+    start = clock();
     vect_set_random(&pk_seedexpander, (uint64_t *) h_256);
+    end = clock();
+    keygen_time->vect_set_random_time += ((uint32_t)(end - start));
+
+    start = clock();
     vect_mul(tmp_256, y_256, h_256);
     vect_add(s, (uint64_t *) x_256, (uint64_t *) tmp_256, VEC_N_256_SIZE_64);
+    end = clock();
+    keygen_time->vect_operation_time += ((uint32_t)(end - start));
+
 
     // Parse keys to string
+    start = clock();
     hqc_public_key_to_string(pk, pk_seed, s);
     hqc_secret_key_to_string(sk, sk_seed, sigma, pk);
+    end = clock();
+    keygen_time->parsing_time += ((uint32_t)(end - start));
 
     #ifdef VERBOSE
         printf("\n\nsk_seed: "); for(int i = 0 ; i < SEED_BYTES ; ++i) printf("%02x", sk_seed[i]);
@@ -100,7 +124,7 @@ void hqc_pke_keygen(unsigned char* pk, unsigned char* sk) {
  * @param[in] theta Seed used to derive randomness required for encryption
  * @param[in] pk String containing the public key
  */
-void hqc_pke_encrypt(uint64_t *u, uint64_t *v, uint64_t *m, unsigned char *theta, const unsigned char *pk) {
+void hqc_pke_encrypt(uint64_t *u, uint64_t *v, uint64_t *m, unsigned char *theta, const unsigned char *pk, struct Trace_time* trace_time) {
     seedexpander_state seedexpander;
     static __m256i h_256[VEC_N_256_SIZE_64 >> 2];
     static __m256i s_256[VEC_N_256_SIZE_64 >> 2];
@@ -113,6 +137,7 @@ void hqc_pke_encrypt(uint64_t *u, uint64_t *v, uint64_t *m, unsigned char *theta
     static __m256i tmp2_256[VEC_N_256_SIZE_64 >> 2];
     static __m256i tmp3_256[VEC_N_256_SIZE_64 >> 2];
     static uint64_t tmp4[VEC_N_256_SIZE_64];
+    clock_t start, end;
 
     #ifdef __STDC_LIB_EXT1__
         memset_s(r2_256, 0, (VEC_N_256_SIZE_64 >> 2) * sizeof(__m256i));
@@ -128,23 +153,34 @@ void hqc_pke_encrypt(uint64_t *u, uint64_t *v, uint64_t *m, unsigned char *theta
         memset(e_256, 0, (VEC_N_256_SIZE_64 >> 2) * sizeof(__m256i));
     #endif
 
+    start = clock();
     // Create seed_expander from theta
     seedexpander_init(&seedexpander, theta, SEED_BYTES);
+    end = clock();
+    trace_time->seedexpander_init_time += ((uint32_t)(end - start));
 
     // Retrieve h and s from public key
-    hqc_public_key_from_string((uint64_t *) h_256, (uint64_t *) s_256, pk);
+    hqc_public_key_from_string((uint64_t *) h_256, (uint64_t *) s_256, pk, trace_time);
 
     // Generate r1, r2 and e
+    start = clock();
     vect_set_random_fixed_weight(&seedexpander, r1_256, PARAM_OMEGA_R);
     vect_set_random_fixed_weight(&seedexpander, r2_256, PARAM_OMEGA_R);
     vect_set_random_fixed_weight(&seedexpander, e_256, PARAM_OMEGA_E);
+    end = clock();
+    trace_time->vect_set_random_fixed_weight_time += ((uint32_t)(end - start));
 
     // Compute u = r1 + r2.h
+    start = clock();
     vect_mul(tmp1_256, r2_256, h_256);
     vect_add(u, (uint64_t *) r1_256, (uint64_t *) tmp1_256, VEC_N_256_SIZE_64);
+    end = clock();
+    trace_time->vect_operation_time += ((uint32_t)(end - start));
 
     // Compute v = m.G by encoding the message
-    code_encode(v, m);
+    code_encode(v, m, trace_time);
+
+    start = clock();
     vect_resize((uint64_t *) tmp2_256, PARAM_N, v, PARAM_N1N2);
 
     // Compute v = m.G + s.r2 + e
@@ -152,6 +188,8 @@ void hqc_pke_encrypt(uint64_t *u, uint64_t *v, uint64_t *m, unsigned char *theta
     vect_add(tmp4, (uint64_t *) e_256, (uint64_t *) tmp3_256, VEC_N_256_SIZE_64);
     vect_add((uint64_t *) tmp3_256, (uint64_t *) tmp2_256, tmp4, VEC_N_256_SIZE_64);
     vect_resize(v, PARAM_N1N2, (uint64_t *) tmp3_256, PARAM_N);
+    end = clock();
+    trace_time->vect_operation_time += ((uint32_t)(end - start));
 
     #ifdef VERBOSE
         printf("\n\nh: "); vect_print((uint64_t *) h_256, VEC_N_SIZE_BYTES);
@@ -177,13 +215,14 @@ void hqc_pke_encrypt(uint64_t *u, uint64_t *v, uint64_t *m, unsigned char *theta
  * @param[in] sk String containing the secret key
  * @returns 0 
  */
-uint8_t hqc_pke_decrypt(uint64_t *m, uint8_t *sigma, const __m256i *u_256, const uint64_t *v, const uint8_t *sk) {
+uint8_t hqc_pke_decrypt(uint64_t *m, uint8_t *sigma, const __m256i *u_256, const uint64_t *v, const uint8_t *sk, struct Trace_time *trace_time) {
     static __m256i x_256[VEC_N_256_SIZE_64 >> 2] = {0};
     static __m256i y_256[VEC_N_256_SIZE_64 >> 2] = {0};
     uint8_t pk[PUBLIC_KEY_BYTES] = {0};
     static uint64_t tmp1[VEC_N_256_SIZE_64] = {0};
     static uint64_t tmp2[VEC_N_256_SIZE_64] = {0};
     static __m256i tmp3_256[VEC_N_256_SIZE_64 >> 2];
+    clock_t start, end;
 
     #ifdef __STDC_LIB_EXT1__
         memset_s(y_256, 0, (VEC_N_256_SIZE_64 >> 2) * sizeof(__m256i));
@@ -192,12 +231,15 @@ uint8_t hqc_pke_decrypt(uint64_t *m, uint8_t *sigma, const __m256i *u_256, const
     #endif
 
     // Retrieve x, y, pk from secret key
-    hqc_secret_key_from_string(x_256, y_256, sigma, pk, sk);
+    hqc_secret_key_from_string(x_256, y_256, sigma, pk, sk, trace_time);
 
     // Compute v - u.y
+    start = clock();
     vect_resize(tmp1, PARAM_N, v, PARAM_N1N2);
     vect_mul(tmp3_256, y_256, u_256);
     vect_add(tmp2, tmp1, (uint64_t *) tmp3_256, VEC_N_256_SIZE_64);
+    end = clock();
+    trace_time->vect_operation_time += ((uint32_t)(end - start));
 
     #ifdef VERBOSE
         printf("\n\nu: "); vect_print((uint64_t *) u_256, VEC_N_SIZE_BYTES);
@@ -207,7 +249,7 @@ uint8_t hqc_pke_decrypt(uint64_t *m, uint8_t *sigma, const __m256i *u_256, const
     #endif
 
     // Compute m by decoding v - u.y
-    code_decode(m, tmp2);
+    code_decode(m, tmp2, trace_time);
     
     return 0;
 }

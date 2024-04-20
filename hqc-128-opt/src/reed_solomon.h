@@ -7,12 +7,13 @@
  */
 
 #include "parameters.h"
+#include "profiling.h"
 #include <stddef.h>
 #include <stdint.h>
 
 
 void reed_solomon_encode(uint64_t *cdw, const uint64_t *msg);
-void reed_solomon_decode(uint64_t *msg, uint64_t *cdw);
+void reed_solomon_decode(uint64_t *msg, uint64_t *cdw, struct Trace_time* trace_time);
 
 void compute_generator_poly(uint16_t *poly);
 

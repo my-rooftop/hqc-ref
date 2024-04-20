@@ -7,9 +7,11 @@
 #include "gf.h"
 #include "reed_solomon.h"
 #include "parameters.h"
+#include "profiling.h"
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+#include <time.h>
 #ifdef VERBOSE
 #include <stdbool.h>
 #include <stdio.h>
@@ -500,7 +502,7 @@ static void correct_errors(uint8_t *cdw, const uint16_t *error_values) {
  * @param[out] msg Array of size VEC_K_SIZE_64 receiving the decoded message
  * @param[in] cdw Array of size VEC_N1_SIZE_64 storing the received word
  */
-void reed_solomon_decode(uint64_t* msg, uint64_t* cdw) {
+void reed_solomon_decode(uint64_t* msg, uint64_t* cdw, struct Trace_time* trace_time) {
     uint8_t cdw_bytes[PARAM_N1] = {0};
     __m256i syndromes256[SYND_SIZE_256];
     uint16_t *syndromes = (uint16_t *) syndromes256;
@@ -509,28 +511,47 @@ void reed_solomon_decode(uint64_t* msg, uint64_t* cdw) {
     uint16_t z[PARAM_N1] = {0};
     uint16_t error_values[PARAM_N1] = {0};
     uint16_t deg;
+    clock_t start, end;
 
     // Copy the vector in an array of bytes
     memcpy(cdw_bytes, cdw, PARAM_N1);
 
     // Calculate the 2*PARAM_DELTA syndromes
+    start = clock();
     compute_syndromes(syndromes256, cdw_bytes);
+    end = clock();
+    trace_time->compute_syndromes_time += ((uint32_t)(end - start));
 
     // Compute the error locator polynomial sigma
     // Sigma's degree is at most PARAM_DELTA but the FFT requires the extra room
+    start = clock();
     deg = compute_elp(sigma, syndromes);
+    end = clock();
+    trace_time->compute_elp_time += ((uint32_t)(end-start));
 
     // Compute the error polynomial error
+    start = clock();
     compute_roots(error, sigma);
+    end = clock();
+    trace_time->compute_roots_time += ((uint32_t)(end - start));
 
     // Compute the polynomial z(x)
+    start = clock();
     compute_z_poly(z, sigma, deg, syndromes);
+    end = clock();
+    trace_time->compute_z_poly_time += ((uint32_t)(end - start));
 
     // Compute the error values
+    start = clock();
     compute_error_values(error_values, z, error);
+    end = clock();
+    trace_time->compute_error_values_time += ((uint32_t)(end - start));
 
     // Correct the errors
+    start = clock();
     correct_errors(cdw_bytes, error_values);
+    end = clock();
+    trace_time->correct_errors_time += ((uint32_t)(end - start));
 
     // Retrieve the message from the decoded codeword
     memcpy(msg, cdw_bytes + (PARAM_G - 1) , PARAM_K);

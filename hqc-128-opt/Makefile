@@ -16,7 +16,7 @@ LIB:=$(SHA3_INCLUDE)
 MAIN_HQC:=$(ROOT)/src/main_hqc.c
 MAIN_KAT:=$(ROOT)/src/main_kat.c
 
-HQC_OBJS:=vector.o reed_muller.o reed_solomon.o fft.o gf.o gf2x.o code.o parsing.o hqc.o kem.o shake_ds.o shake_prng.o
+HQC_OBJS:=vector.o reed_muller.o reed_solomon.o fft.o gf.o gf2x.o code.o parsing.o hqc.o kem.o shake_ds.o shake_prng.o  profiling.o
 HQC_OBJS_VERBOSE:=vector.o reed_muller.o reed_solomon-verbose.o fft.o gf.o gf2x.o code-verbose.o parsing.o hqc-verbose.o kem-verbose.o shake_ds.o shake_prng.o
 LIB_OBJS:= fips202.o
 
