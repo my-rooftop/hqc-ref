@@ -35,21 +35,21 @@ void time_analysis(Trace_time* trace_time) {
     printf("%-38s %-10s %-10s\n", "Function", "Time (ms)", "Percentage");
     printf("---------------------------------- ---------- ----------\n");
     if (vect_set_random_fixed_weight_percent > 0)
-        printf("%-38s %.6fms (%.2f%%)\n", "vect_set_random_fixed_weight_time:", vect_set_random_fixed_weight_ms, vect_set_random_fixed_weight_percent);
+        printf("%-38s %.6fms (%.2f%%)\n", "vect_set_random_fixed_weight:", vect_set_random_fixed_weight_ms, vect_set_random_fixed_weight_percent);
     if (vect_operation_percent > 0)
-        printf("%-38s %.6fms (%.2f%%)\n", "vect_operation_time:", vect_operation_ms, vect_operation_percent);
+        printf("%-38s %.6fms (%.2f%%)\n", "vect_operation:", vect_operation_ms, vect_operation_percent);
     if (vect_set_random_percent > 0)
-        printf("%-38s %.6fms (%.2f%%)\n", "vect_set_random_time:", vect_set_random_ms, vect_set_random_percent);
+        printf("%-38s %.6fms (%.2f%%)\n", "vect_set_random:", vect_set_random_ms, vect_set_random_percent);
     if (rs_encode_percent > 0)
-        printf("%-38s %.6fms (%.2f%%)\n", "[Encode] rs_encode_time:", rs_encode_ms, rs_encode_percent);
+        printf("%-38s %.6fms (%.2f%%)\n", "[Encode] rs_encode:", rs_encode_ms, rs_encode_percent);
     if (rm_encode_percent > 0)
-        printf("%-38s %.6fms (%.2f%%)\n", "[Encode] rm_encode_time:", rm_encode_ms, rm_encode_percent);
+        printf("%-38s %.6fms (%.2f%%)\n", "[Encode] rm_encode:", rm_encode_ms, rm_encode_percent);
     if (rs_decode_percent > 0)
-        printf("%-38s %.6fms (%.2f%%)\n", "[Decode] rs_decode_time:", rs_decode_ms, rs_decode_percent);
+        printf("%-38s %.6fms (%.2f%%)\n", "[Decode] rs_decode:", rs_decode_ms, rs_decode_percent);
     if (rm_decode_percent > 0)
-        printf("%-38s %.6fms (%.2f%%)\n", "[Decode] rm_decode_time:", rm_decode_ms, rm_decode_percent);
+        printf("%-38s %.6fms (%.2f%%)\n", "[Decode] rm_decode:", rm_decode_ms, rm_decode_percent);
     if (shake256_512_ds_percent > 0)
-        printf("%-38s %.6fms (%.2f%%)\n", "shake256_512_ds_time:", shake256_512_ds_ms, shake256_512_ds_percent);
+        printf("%-38s %.6fms (%.2f%%)\n", "shake256_512_ds:", shake256_512_ds_ms, shake256_512_ds_percent);
     
     printf("\nTotal exec time: %.6fms \n", total_ms);
     printf("\n");
